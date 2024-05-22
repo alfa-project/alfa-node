@@ -112,7 +112,8 @@ class AlfaNode : public rclcpp::Node {
   // Multithreading
   void set_multi_thread(int n_threads, void (*func)(AlfaNode *), AlfaNode *);
 
-  std::uint32_t get_debug_point(std::uint16_t);
+  float get_debug_point(std::uint16_t);
+  void set_debug_point(std::uint16_t, float);
 
  private:
   // Point clouds

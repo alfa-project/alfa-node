@@ -657,8 +657,7 @@ void AlfaNode::store_pointcloud_cartesian(
     size_t size = (*this->pointcloud.size) * sizeof(std::uint64_t);
     if (ioctl(fd2, ALFA_IOCTL_TRIGGER_WRITE, &size) == -1) {
       verbose_fail("store_pointcloud_cartesian", "ioctl failed");
-      while (1)
-        ;
+      while (1);
     }
 
 #ifdef ALFA_VERBOSE
@@ -706,8 +705,7 @@ void AlfaNode::load_pointcloud_cartesian(
     size_t size = (*this->pointcloud.size) * sizeof(std::uint64_t);
     if (ioctl(fd2, ALFA_IOCTL_TRIGGER_READ, &size) == -1) {
       verbose_fail("load_pointcloud_cartesian", "ioctl failed");
-      while (1)
-        ;
+      while (1);
     }
 
     // Define constants
@@ -767,16 +765,24 @@ void AlfaNode::load_pointcloud_cartesian(
     verbose_not_defined("load_pointcloud_cartesian");
 }
 
-std::uint32_t AlfaNode::get_debug_point(std::uint16_t number) {
-  if (configuration.hardware_support.hardware_extension) {
-    if (number <= 20)
-      return unit_registers->debug_points.value[number];
+float AlfaNode::get_debug_point(std::uint16_t number) {
+  if (number <= configuration.number_of_debug_points)
+    if (configuration.hardware_support.hardware_extension)
+      return (static_cast<float>(unit_registers->debug_points.value[number]));
     else
-      return 0;
-  } else {
+      return debug_points_message[number].metric;
+  else {
     verbose_not_defined("get_debug_point");
     return 1;
   }
+}
+
+void AlfaNode::set_debug_point(std::uint16_t number, float value) {
+  if (number <= configuration.number_of_debug_points &&
+      !configuration.hardware_support.hardware_extension)
+    debug_points_message[number].metric = value;
+  else
+    verbose_not_defined("get_debug_point");
 }
 
 // Parameters Callback ----------------------------------
@@ -928,12 +934,10 @@ void AlfaNode::metrics_setup() {
   number_of_processed_points.message.units = "points";
   number_of_processed_points.message.metric_name = "Processed Points";
 
-  if (configuration.hardware_support.hardware_extension) {
-    for (int i = 0; i < 20; i++) {
-      debug_points_message[i].units = "";
-      debug_points_message[i].metric_name = "Debug point " + std::to_string(i);
-      debug_points_message[i].metric = 0;
-    }
+  for (int i = 0; i < 20; i++) {
+    debug_points_message[i].units = "";
+    debug_points_message[i].metric_name = "Debug point " + std::to_string(i);
+    debug_points_message[i].metric = 0;
   }
 }
 
@@ -952,15 +956,11 @@ void AlfaNode::metrics_publish() {
       output_metrics.metrics.push_back(number_of_processed_points.message);
     }
 
-    if (configuration.hardware_support.hardware_extension) {
-      if (configuration.metrics_publishing_type & DEBUG_POINTS) {
-        for (unsigned int i = 0; i < configuration.number_of_debug_points;
-             i++) {
-          debug_points_message[i].metric =
-              static_cast<unsigned int>(get_debug_point(i));
+    if (configuration.metrics_publishing_type & DEBUG_POINTS) {
+      for (unsigned int i = 0; i < configuration.number_of_debug_points; i++) {
+        debug_points_message[i].metric = static_cast<float>(get_debug_point(i));
 
-          output_metrics.metrics.push_back(debug_points_message[i]);
-        }
+        output_metrics.metrics.push_back(debug_points_message[i]);
       }
     }
     publish_metrics(output_metrics);
