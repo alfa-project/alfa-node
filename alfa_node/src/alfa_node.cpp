@@ -847,11 +847,13 @@ float AlfaNode::get_debug_point(std::uint16_t number) {
   }
 }
 
-void AlfaNode::set_debug_point(std::uint16_t number, float value) {
+void AlfaNode::set_debug_point(std::uint16_t number, float value,
+                               string tag = "") {
   if (number <= configuration.number_of_debug_points &&
-      !configuration.hardware_support.hardware_extension)
+      !configuration.hardware_support.hardware_extension) {
     debug_points_message[number].metric = value;
-  else
+    if (tag != "") debug_points_message[number].metric_name = tag;
+  } else
     verbose_not_defined("get_debug_point");
 }
 
@@ -942,7 +944,16 @@ bool AlfaNode::get_point_input_pointcloud(std::uint32_t position,
   return false;
 }
 
-// Multiple calls, give points from the input_pointcloud squentially, retun
+// Get specific point from input cloud, using the point index. Returns the point
+// if successfull, the last point otherwise
+AlfaPoint AlfaNode::get_point_input_pointcloud(std::uint32_t position) {
+  if (position <= get_input_pointcloud_size() - 1) {
+    return (*input_pointcloud)[position];
+  } else
+    return (*input_pointcloud)[get_input_pointcloud_size() - 1];
+}
+
+// Multiple calls, give points from the input_pointcloud squentially, return
 // true if there are points left, false otherwise
 bool AlfaNode::get_point_input_pointcloud(AlfaPoint &point) {
   if (point_counter < get_input_pointcloud_size()) {
@@ -950,6 +961,18 @@ bool AlfaNode::get_point_input_pointcloud(AlfaPoint &point) {
     point = (*input_pointcloud)[point_counter++];
     input_mutex.unlock();
 
+    return true;
+  }
+
+  return false;
+}
+
+// Set specific custom field value in the output_pointcloud position, returns
+// true if successfull, false otherwise
+bool AlfaNode::set_custom_field_output_pointcloud(std::uint32_t position,
+                                                  std::uint32_t value) {
+  if (position < (get_output_pointcloud_size() - 1)) {
+    (*output_pointcloud)[position].custom_field = value;
     return true;
   }
 

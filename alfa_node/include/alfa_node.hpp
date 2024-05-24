@@ -106,14 +106,17 @@ class AlfaNode : public rclcpp::Node {
 
   void push_point_output_pointcloud(AlfaPoint point);
   bool get_point_input_pointcloud(std::uint32_t position, AlfaPoint &point);
+  AlfaPoint get_point_input_pointcloud(std::uint32_t position);
   bool get_point_input_pointcloud(AlfaPoint &point);
   bool reset_input_pointcloud_counter();
+  bool set_custom_field_output_pointcloud(std::uint32_t position,
+                                          std::uint32_t custom_field);
 
   // Multithreading
   void set_multi_thread(int n_threads, void (*func)(AlfaNode *), AlfaNode *);
 
   float get_debug_point(std::uint16_t);
-  void set_debug_point(std::uint16_t, float);
+  void set_debug_point(std::uint16_t, float, string);
 
  private:
   // Point clouds
