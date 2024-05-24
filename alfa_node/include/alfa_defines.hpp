@@ -29,6 +29,10 @@
 #define CUSTOM_FIELD_LABEL 2
 #define CUSTOM_FIELD_RGB 3
 #define CUSTOM_FIELD_FILTER 4
+#define CUSTOM_FIELD_INTENSITY_LABEL 5
+
+// Filter labels
+#define FILTER_VALUE 2
 
 // Load/Store types
 #define LOAD_STORE_CARTESIAN 0
@@ -120,5 +124,74 @@
 #define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
 
 #define FIXED_POINT_MULTIPLIER 100.0f
+
+// ALFA LABELS (Patch to fit in 8 bits)
+
+/*------------------------------
+     Paris-Lille 3D Labels
+------------------------------*/
+
+// GROUND-RELATED LABELS
+#define PL_GROUND 200        // Paris-Lille 3D -> 202000000, but 200 on ALFA
+#define PL_ROAD 202          // Paris-Lille 3D -> 202020000, but 202 on ALFA
+#define PL_SIDEWALK 203      // Paris-Lille 3D -> 202030000, but 203 on ALFA
+#define PL_CURB 204          // Paris-Lille 3D -> 202040000, but 204 on ALFA
+#define PL_ISLAND 205        // Paris-Lille 3D -> 202050000, but 205 on ALFA
+#define PL_VEGETATION 206    // Paris-Lille 3D -> 202060000, but 206 on ALFA
+#define PL_OTHER_GROUND 201  // Paris-Lille 3D -> 202010000, but 201 on ALFA
+
+/*------------------------------
+     SemanticKITTI Labels
+------------------------------*/
+
+// UNLABELED
+#define UNLABELED 0
+
+// OUTLIER
+#define OUTLIER 1
+
+/* GROUND-RELATED */
+#define ROAD 40
+#define PARKING 44
+#define SIDEWALK 48
+#define OTHER_GROUND 49
+#define LANE_MARKING 60
+
+/* STRUCTURES */
+#define BUILDING 50
+#define OTHER_STRUCTURE 52
+
+/* VEHICLE */
+#define CAR 10
+#define BICYCLE 11
+#define BUS 13
+#define MOTORCYCLE 15
+#define ON_RAILS 16
+#define TRUCK 18
+#define OTHER_VEHICLE 20
+#define MOVING_CAR 152            // SemanticKITTI -> 252, but 152 on ALFA
+#define MOVING_ON_RAILS 156       // SemanticKITTI -> 256, but 156 on ALFA
+#define MOVING_BUS 157            // SemanticKITTI -> 257, but 157 on ALFA
+#define MOVING_TRUCK 158          // SemanticKITTI -> 258, but 158 on ALFA
+#define MOVING_OTHER_VEHICLE 159  // SemanticKITTI -> 259, but 159 on ALFA
+
+/* NATURE */
+#define VEGETATION 70
+#define TRUNK 71
+#define TERRAIN 72
+
+/* HUMAN */
+#define PERSON 30
+#define BICYCLIST 31
+#define MOTORCYCLIST 32
+#define MOVING_BICYCLIST 153     // SemanticKITTI -> 253, but 153 on ALFA
+#define MOVING_PERSON 154        // SemanticKITTI -> 254, but 154 on ALFA
+#define MOVING_MOTORCYCLIST 155  // SemanticKITTI -> 255, but 155 on ALFA
+
+/* OBJECT */
+#define FENCE 51
+#define POLE 80
+#define TRAFFIC_SIGN 81
+#define OTHER_OBJECT 99
 
 #endif  // ALFA_DEFINES_H
