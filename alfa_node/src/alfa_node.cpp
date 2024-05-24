@@ -283,13 +283,32 @@ void AlfaNode::convert_msg_to_pointcloud() {
 
   // Find the field in the message to convert into custom field
   int field_offset = -1;  // Initialize to an invalid value
+  int field_offset_2 = -1;
+
+  int field_type = 0;
+  int field_type_2 = 0;
+
   auto custom_type = this->configuration.custom_field_conversion_type;
 
-  // Common loop for finding the field offset based on field name
-  auto findFieldOffsetByName = [&](const std::string &fieldName) {
+  // Common loop for finding the field offsets based on field names
+  auto findFieldOffsetByName = [&](const std::string &fieldName = "",
+                                   const std::string &fieldName2 = "") {
     for (const auto &field : fields) {
-      if (field.name == fieldName) {
+      if (fieldName == "")
+        break;
+      else if (field.name == fieldName) {
         field_offset = field.offset;
+        field_type = field.datatype;
+        break;
+      }
+    }
+
+    for (const auto &field : fields) {
+      if (fieldName == "")
+        break;
+      else if (field.name == fieldName2) {
+        field_offset_2 = field.offset;
+        field_type_2 = field.datatype;
         break;
       }
     }
@@ -336,6 +355,15 @@ void AlfaNode::convert_msg_to_pointcloud() {
 #endif
       break;
 
+    case CUSTOM_FIELD_INTENSITY_LABEL:
+      findFieldOffsetByName("intensity", "label");
+#ifdef ALFA_VERBOSE
+      verbose_info(
+          "main_thread",
+          "convert_msg_to_pointcloud: field name is INTENSITY and LABEL");
+#endif
+      break;
+
     default:
       findFieldOffsetByName("intensity");
 #ifdef ALFA_VERBOSE
@@ -362,21 +390,64 @@ void AlfaNode::convert_msg_to_pointcloud() {
        << endl;
 #endif
 
-  // Iterate through the data and populate your custom point cloud
+  // Iterate through the data and populate custom point cloud
   for (size_t i = 0; i < data.size(); i += ros_pointcloud_temp.point_step) {
     AlfaPoint point;
-    // Extract x, y, z from the data (assuming these fields are at offsets 0,
-    // 4, and 8 respectively)
+    // Extract x, y, z from the data (assuming these fields are at offsets
+    // 0, 4, and 8 respectively)
     memcpy(&(point.x), &data[i + fields[0].offset], sizeof(float));
     memcpy(&(point.y), &data[i + fields[1].offset], sizeof(float));
     memcpy(&(point.z), &data[i + fields[2].offset], sizeof(float));
 
-    if (field_offset != -1)
-      memcpy(&(point.custom_field), &data[i + field_offset],
-             sizeof(std::uint32_t));
-    else
-      point.custom_field = 0;
+    point.custom_field = 0;
 
+    // Extract the custom field from the data
+    auto fillCustomField = [&](const std::uint32_t &field_offset,
+                               const std::uint32_t &field_type,
+                               const bool &byte_selector) {
+      switch (field_type) {
+        case sensor_msgs::msg::PointField::FLOAT32: {  // Intensity
+          float temp_float;
+          memcpy(&temp_float, &data[i + field_offset], sizeof(float));
+          uint8_t temp_8;
+          // Handle intensity values in 0-1 range and 0-100 range
+          if (temp_float <= 1) {
+            temp_8 = static_cast<uint8_t>(temp_float * 255);
+          } else
+            temp_8 = static_cast<uint8_t>(temp_float * 255 / 100);
+          if (byte_selector)
+            point.custom_field |= temp_8 << 8;
+          else
+            point.custom_field |= temp_8;
+          break;
+        }
+
+        case sensor_msgs::msg::PointField::UINT16: {  // Label
+          std::uint16_t temp_uint16;
+          memcpy(&temp_uint16, &data[i + field_offset], sizeof(std::uint16_t));
+          uint8_t temp_8;
+          // Handle labels values from 0 to 255
+          if (temp_uint16 < 252)
+            temp_8 = static_cast<uint8_t>(temp_uint16);
+          else
+            temp_8 = static_cast<uint8_t>(temp_uint16 - 100);
+          if (byte_selector)
+            point.custom_field |= temp_8 << 8;
+          else
+            point.custom_field |= temp_8;
+          break;
+        }
+
+        default:
+          point.custom_field = 0;
+          break;
+      }
+    };
+
+    // Fill the custom field
+    if (field_offset != -1) fillCustomField(field_offset, field_type, true);
+    if (field_offset_2 != -1)
+      fillCustomField(field_offset_2, field_type_2, false);
     input_pointcloud->emplace_back(std::move(point));  // Use emplace_back
   }
 
@@ -710,7 +781,6 @@ void AlfaNode::load_pointcloud_cartesian(
 
     // Define constants
     const std::uint32_t POINT_STRIDE = 4;  // Assuming 4 elements per point
-    const std::int16_t FILTER_VALUE = 2;
 
     // Calculate the number of points
     const std::uint32_t num_points = (*this->pointcloud.size);
