@@ -304,7 +304,7 @@ void AlfaNode::convert_msg_to_pointcloud() {
     }
 
     for (const auto &field : fields) {
-      if (fieldName == "")
+      if (fieldName2 == "")
         break;
       else if (field.name == fieldName2) {
         field_offset_2 = field.offset;
@@ -324,7 +324,7 @@ void AlfaNode::convert_msg_to_pointcloud() {
       break;
 
     case CUSTOM_FIELD_INTENSITY:
-      findFieldOffsetByName("intensity");
+      findFieldOffsetByName("", "intensity");
 #ifdef ALFA_VERBOSE
       verbose_info("main_thread",
                    "convert_msg_to_pointcloud: field name is intensity");
@@ -332,7 +332,7 @@ void AlfaNode::convert_msg_to_pointcloud() {
       break;
 
     case CUSTOM_FIELD_LABEL:
-      findFieldOffsetByName("label");
+      findFieldOffsetByName("", "label");
 #ifdef ALFA_VERBOSE
       verbose_info("main_thread",
                    "convert_msg_to_pointcloud: field name is label");
@@ -340,7 +340,7 @@ void AlfaNode::convert_msg_to_pointcloud() {
       break;
 
     case CUSTOM_FIELD_RGB:
-      findFieldOffsetByName("rgb");
+      findFieldOffsetByName("", "rgb");
 #ifdef ALFA_VERBOSE
       verbose_info("main_thread",
                    "convert_msg_to_pointcloud: field name is rgb");
@@ -348,7 +348,7 @@ void AlfaNode::convert_msg_to_pointcloud() {
       break;
 
     case CUSTOM_FIELD_FILTER:
-      findFieldOffsetByName("intensity");
+      findFieldOffsetByName("", "intensity");
 #ifdef ALFA_VERBOSE
       verbose_info("main_thread",
                    "convert_msg_to_pointcloud: field name is INTENSITY");
@@ -412,9 +412,9 @@ void AlfaNode::convert_msg_to_pointcloud() {
           uint8_t temp_8;
           // Handle intensity values in 0-1 range and 0-100 range
           if (temp_float <= 1) {
-            temp_8 = static_cast<uint8_t>(temp_float * 255);
+            temp_8 = static_cast<uint8_t>(temp_float * 100);
           } else
-            temp_8 = static_cast<uint8_t>(temp_float * 255 / 100);
+            temp_8 = static_cast<uint8_t>(temp_float);
           if (byte_selector)
             point.custom_field |= temp_8 << 8;
           else
@@ -425,12 +425,13 @@ void AlfaNode::convert_msg_to_pointcloud() {
         case sensor_msgs::msg::PointField::UINT16: {  // Label
           std::uint16_t temp_uint16;
           memcpy(&temp_uint16, &data[i + field_offset], sizeof(std::uint16_t));
-          uint8_t temp_8;
-          // Handle labels values from 0 to 255
-          if (temp_uint16 < 252)
-            temp_8 = static_cast<uint8_t>(temp_uint16);
-          else
-            temp_8 = static_cast<uint8_t>(temp_uint16 - 100);
+          uint8_t temp_8 = 0;
+          try {
+            temp_8 = semantic_kitti_to_alfa.at(static_cast<int>(temp_uint16));
+
+          } catch (const std::out_of_range &e) {
+            temp_8 = 0;
+          }
           if (byte_selector)
             point.custom_field |= temp_8 << 8;
           else
@@ -448,6 +449,7 @@ void AlfaNode::convert_msg_to_pointcloud() {
     if (field_offset != -1) fillCustomField(field_offset, field_type, true);
     if (field_offset_2 != -1)
       fillCustomField(field_offset_2, field_type_2, false);
+
     input_pointcloud->emplace_back(std::move(point));  // Use emplace_back
   }
 
@@ -854,7 +856,7 @@ void AlfaNode::set_debug_point(std::uint16_t number, float value,
     debug_points_message[number].metric = value;
     if (tag != "") debug_points_message[number].metric_name = tag;
   } else
-    verbose_not_defined("get_debug_point");
+    verbose_info("set_debug_point", "Debug point number not defined");
 }
 
 // Parameters Callback ----------------------------------
@@ -951,6 +953,15 @@ AlfaPoint AlfaNode::get_point_input_pointcloud(std::uint32_t position) {
     return (*input_pointcloud)[position];
   } else
     return (*input_pointcloud)[get_input_pointcloud_size() - 1];
+}
+
+// Get specific point from output cloud, using the point index. Returns the
+// point if successfull, the last point otherwise
+AlfaPoint AlfaNode::get_point_output_pointcloud(std::uint32_t position) {
+  if (position <= get_output_pointcloud_size() - 1) {
+    return (*output_pointcloud)[position];
+  } else
+    return (*output_pointcloud)[get_input_pointcloud_size() - 1];
 }
 
 // Multiple calls, give points from the input_pointcloud squentially, return
@@ -1133,3 +1144,77 @@ void AlfaNode::verbose_info(string function, string message) {
 void AlfaNode::verbose_not_defined(string function) {
   std::cout << "ALFA:" << function << "-> HARDWARE NOT DEFINED!!" << std::endl;
 }
+
+// ALFA to SemanticKITTI mapping
+const std::unordered_map<int, int> alfa_to_semantic_kitti = {
+    {ALFA_LABEL_UNLABELED, SEMANTIC_UNLABELED},
+    {ALFA_LABEL_OUTLIER, SEMANTIC_OUTLIER},
+    {ALFA_LABEL_CAR, SEMANTIC_CAR},
+    {ALFA_LABEL_BICYCLE, SEMANTIC_BICYCLE},
+    {ALFA_LABEL_BUS, SEMANTIC_BUS},
+    {ALFA_LABEL_MOTORCYCLE, SEMANTIC_MOTORCYCLE},
+    {ALFA_LABEL_ON_RAILS, SEMANTIC_ON_RAILS},
+    {ALFA_LABEL_TRUCK, SEMANTIC_TRUCK},
+    {ALFA_LABEL_OTHER_VEHICLE, SEMANTIC_OTHER_VEHICLE},
+    {ALFA_LABEL_PERSON, SEMANTIC_PERSON},
+    {ALFA_LABEL_BICYCLIST, SEMANTIC_BICYCLIST},
+    {ALFA_LABEL_MOTORCYCLIST, SEMANTIC_MOTORCYCLIST},
+    {ALFA_LABEL_ROAD, SEMANTIC_ROAD},
+    {ALFA_LABEL_PARKING, SEMANTIC_PARKING},
+    {ALFA_LABEL_SIDEWALK, SEMANTIC_SIDEWALK},
+    {ALFA_LABEL_OTHER_GROUND, SEMANTIC_OTHER_GROUND},
+    {ALFA_LABEL_BUILDING, SEMANTIC_BUILDING},
+    {ALFA_LABEL_FENCE, SEMANTIC_FENCE},
+    {ALFA_LABEL_OTHER_STRUCTURE, SEMANTIC_OTHER_STRUCTURE},
+    {ALFA_LABEL_LANE_MARKING, SEMANTIC_LANE_MARKING},
+    {ALFA_LABEL_VEGETATION, SEMANTIC_VEGETATION},
+    {ALFA_LABEL_TRUNK, SEMANTIC_TRUNK},
+    {ALFA_LABEL_TERRAIN, SEMANTIC_TERRAIN},
+    {ALFA_LABEL_POLE, SEMANTIC_POLE},
+    {ALFA_LABEL_TRAFFIC_SIGN, SEMANTIC_TRAFFIC_SIGN},
+    {ALFA_LABEL_OTHER_OBJECT, SEMANTIC_OTHER_OBJECT},
+    {ALFA_LABEL_MOVING_CAR, SEMANTIC_MOVING_CAR},
+    {ALFA_LABEL_MOVING_BICYCLIST, SEMANTIC_MOVING_BICYCLIST},
+    {ALFA_LABEL_MOVING_PERSON, SEMANTIC_MOVING_PERSON},
+    {ALFA_LABEL_MOVING_MOTORCYCLIST, SEMANTIC_MOVING_MOTORCYCLIST},
+    {ALFA_LABEL_MOVING_ON_RAILS, SEMANTIC_MOVING_ON_RAILS},
+    {ALFA_LABEL_MOVING_BUS, SEMANTIC_MOVING_BUS},
+    {ALFA_LABEL_MOVING_TRUCK, SEMANTIC_MOVING_TRUCK},
+    {ALFA_LABEL_MOVING_OTHER_VEHICLE, SEMANTIC_MOVING_OTHER_VEHICLE}};
+
+// SemanticKITTI to ALFA mapping
+const std::unordered_map<int, int> semantic_kitti_to_alfa = {
+    {SEMANTIC_UNLABELED, ALFA_LABEL_UNLABELED},
+    {SEMANTIC_OUTLIER, ALFA_LABEL_OUTLIER},
+    {SEMANTIC_CAR, ALFA_LABEL_CAR},
+    {SEMANTIC_BICYCLE, ALFA_LABEL_BICYCLE},
+    {SEMANTIC_BUS, ALFA_LABEL_BUS},
+    {SEMANTIC_MOTORCYCLE, ALFA_LABEL_MOTORCYCLE},
+    {SEMANTIC_ON_RAILS, ALFA_LABEL_ON_RAILS},
+    {SEMANTIC_TRUCK, ALFA_LABEL_TRUCK},
+    {SEMANTIC_OTHER_VEHICLE, ALFA_LABEL_OTHER_VEHICLE},
+    {SEMANTIC_PERSON, ALFA_LABEL_PERSON},
+    {SEMANTIC_BICYCLIST, ALFA_LABEL_BICYCLIST},
+    {SEMANTIC_MOTORCYCLIST, ALFA_LABEL_MOTORCYCLIST},
+    {SEMANTIC_ROAD, ALFA_LABEL_ROAD},
+    {SEMANTIC_PARKING, ALFA_LABEL_PARKING},
+    {SEMANTIC_SIDEWALK, ALFA_LABEL_SIDEWALK},
+    {SEMANTIC_OTHER_GROUND, ALFA_LABEL_OTHER_GROUND},
+    {SEMANTIC_BUILDING, ALFA_LABEL_BUILDING},
+    {SEMANTIC_FENCE, ALFA_LABEL_FENCE},
+    {SEMANTIC_OTHER_STRUCTURE, ALFA_LABEL_OTHER_STRUCTURE},
+    {SEMANTIC_LANE_MARKING, ALFA_LABEL_LANE_MARKING},
+    {SEMANTIC_VEGETATION, ALFA_LABEL_VEGETATION},
+    {SEMANTIC_TRUNK, ALFA_LABEL_TRUNK},
+    {SEMANTIC_TERRAIN, ALFA_LABEL_TERRAIN},
+    {SEMANTIC_POLE, ALFA_LABEL_POLE},
+    {SEMANTIC_TRAFFIC_SIGN, ALFA_LABEL_TRAFFIC_SIGN},
+    {SEMANTIC_OTHER_OBJECT, ALFA_LABEL_OTHER_OBJECT},
+    {SEMANTIC_MOVING_CAR, ALFA_LABEL_MOVING_CAR},
+    {SEMANTIC_MOVING_BICYCLIST, ALFA_LABEL_MOVING_BICYCLIST},
+    {SEMANTIC_MOVING_PERSON, ALFA_LABEL_MOVING_PERSON},
+    {SEMANTIC_MOVING_MOTORCYCLIST, ALFA_LABEL_MOVING_MOTORCYCLIST},
+    {SEMANTIC_MOVING_ON_RAILS, ALFA_LABEL_MOVING_ON_RAILS},
+    {SEMANTIC_MOVING_BUS, ALFA_LABEL_MOVING_BUS},
+    {SEMANTIC_MOVING_TRUCK, ALFA_LABEL_MOVING_TRUCK},
+    {SEMANTIC_MOVING_OTHER_VEHICLE, ALFA_LABEL_MOVING_OTHER_VEHICLE}};
